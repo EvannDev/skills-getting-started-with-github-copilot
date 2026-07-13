@@ -19,12 +19,27 @@ document.addEventListener("DOMContentLoaded", () => {
         activityCard.className = "activity-card";
 
         const spotsLeft = details.max_participants - details.participants.length;
+        const participants = details.participants || [];
+        const participantsListMarkup = participants.length
+          ? participants.map((email) => `
+              <li class="participant-item">
+                <span class="participant-email">${email}</span>
+                <button class="participant-delete" type="button" data-activity="${name}" data-email="${email}" aria-label="Remove ${email}">
+                  ✕
+                </button>
+              </li>
+            `).join("")
+          : '<li class="participant-empty">No participants yet</li>';
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <div class="participants-section">
+            <p class="participants-title">Participants</p>
+            <ul class="participants-list">${participantsListMarkup}</ul>
+          </div>
         `;
 
         activitiesList.appendChild(activityCard);
@@ -40,6 +55,48 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Error fetching activities:", error);
     }
   }
+
+  async function unregisterParticipant(activityName, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.detail || "Unable to unregister participant");
+      }
+
+      messageDiv.textContent = result.message;
+      messageDiv.className = "success";
+      messageDiv.classList.remove("hidden");
+
+      await fetchActivities();
+    } catch (error) {
+      messageDiv.textContent = error.message;
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering participant:", error);
+    }
+  }
+
+  activitiesList.addEventListener("click", (event) => {
+    const button = event.target.closest(".participant-delete");
+    if (!button) {
+      return;
+    }
+
+    const activityName = button.getAttribute("data-activity");
+    const email = button.getAttribute("data-email");
+
+    if (activityName && email) {
+      unregisterParticipant(activityName, email);
+    }
+  });
 
   // Handle form submission
   signupForm.addEventListener("submit", async (event) => {
